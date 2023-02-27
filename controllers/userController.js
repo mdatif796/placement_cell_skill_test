@@ -27,8 +27,9 @@ module.exports.createSession = function (req, res) {
 
 // signout
 module.exports.signout = function (req, res) {
-  req.logout();
-  return res.redirect("/users/signin");
+  req.logout((error) => {
+    return res.redirect("/users/signin");
+  });
 };
 
 // create user
