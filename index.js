@@ -1,21 +1,38 @@
 const express = require("express");
 require("dotenv").config();
 const db = require("./config/mongoose");
+const app = express();
 const session = require("express-session");
 const passport = require("passport");
 const passportLocal = require("./config/passport-local-strategy");
 
-const app = express();
+// for permanently store session cookies to db
+const MongoStore = require("connect-mongo");
+
+const port = 8000;
 
 // set ejs as view engine
 app.set("view engine", "ejs");
 app.set("views", "./views");
+
 app.use(
   session({
+    name: "placement_cell",
     secret: process.env.SECRET,
-    resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 100 },
+    resave: false,
+    cookie: {
+      maxAge: 1000 * 60 * 100,
+    },
+    store: MongoStore.create(
+      {
+        mongoUrl: `mongodb+srv://${process.env.MONGO_USER}:${process.env.DATABASE_PASS}@cluster0.lymyd.mongodb.net/${process.env.MONGO_DATABASE}?retryWrites=true&w=majority`,
+        autoRemove: "disabled",
+      },
+      (err) => {
+        console.log(err || "MongoStore connnection setup ok");
+      }
+    ),
   })
 );
 
@@ -30,8 +47,6 @@ app.use(passport.setAuthenticatedUser);
 
 // express router
 app.use("/", require("./routes"));
-
-const port = 8000;
 
 // listen on port
 app.listen(port, (error) => {

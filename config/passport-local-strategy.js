@@ -3,55 +3,76 @@ const LocalStrategy = require("passport-local").Strategy;
 
 const User = require("../models/userSchema");
 
-const local = new LocalStrategy({ usernameField: "email" }, function (
-  email,
-  password,
-  done
-) {
-  User.findOne({ email }, function (error, user) {
-    if (error) {
-      console.log(`Error in finding user: ${error}`);
-      return done(error);
-    }
+// using passport middleware
+passport.use(
+  new LocalStrategy(
+    {
+      usernameField: "email",
+      passReqToCallback: true,
+    },
+    async (req, email, password, done) => {
+      try {
+        // find the user using this email passed
+        let user = await User.findOne({ email: email });
+        console.log("user: ", user);
+        // if user not found or password doesn't match
+        if (!user || !user.isPasswordCorrect(password)) {
+          console.log("Invalid username/password");
+          // report to the passport that user doesn't exist
+          return done(null, false);
+        }
 
-    if (!user || !user.isPasswordCorrect(password)) {
-      console.log("Invalid Username/Password");
-      return done(null, false);
+        // if user found
+        if (user) {
+          // report back to the passport that user exist and sends that user to passport
+          return done(null, user);
+        }
+      } catch (err) {
+        console.log("Error in finding the user --> passport");
+        return done(err);
+      }
     }
-    return done(null, user);
-  });
+  )
+);
+
+// serializing the user to kept user id as a key in cookies
+passport.serializeUser((user, done) => {
+  return done(null, user.id);
 });
 
-passport.use("local", local);
-
-//serialize user
-passport.serializeUser(function (user, done) {
-  done(null, user.id);
-});
-
-//deserialize user
-passport.deserializeUser(function (id, done) {
-  User.findById(id, function (err, user) {
-    if (err) {
-      console.log("Error in finding user--> Passport");
-      return done(err);
-    }
+// deserializing the user to find the user using that key in the cookies
+passport.deserializeUser(async (id, done) => {
+  try {
+    // find the user using that id present in the cookies
+    let user = await User.findById(id);
+    // if the user found then pass that user to the passport
     return done(null, user);
-  });
+  } catch (err) {
+    console.log("Error", err);
+    return done(err);
+  }
 });
 
 // check if user is authenticated
-passport.checkAuthentication = function (req, res, next) {
+passport.checkAuthentication = (req, res, next) => {
+  // if the user is signed in
   if (req.isAuthenticated()) {
     return next();
   }
+
+  // if the user is not signed in
   return res.redirect("/users/signin");
 };
 
 // set authenticated user for views
-passport.setAuthenticatedUser = function (req, res, next) {
+passport.setAuthenticatedUser = (req, res, next) => {
+  // if the user is signed in then
   if (req.isAuthenticated()) {
+    // req.user contains the current signed in user from the session cookies and we are just sending it to the locals for the views
+
     res.locals.user = req.user;
   }
-  next();
+  return next();
 };
+
+module.exports = passport;
